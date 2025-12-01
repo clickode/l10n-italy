@@ -24,6 +24,7 @@
             >
                 <field name="l10n_it_edi_admin_ref" optional="hide" />
             </xpath>
+            <!-- start clickode v19 patch   TODO: mssing electronic invoice preview
             <xpath
                 expr="//page[@name='electronic_invoicing']//field[@name='l10n_it_edi_attachment_id']"
                 position="attributes"
@@ -52,6 +53,7 @@
                     />
                 </div>
             </xpath>
+            -->
             <xpath expr="//page[@name='electronic_invoicing']" position="after">
                 <page
                     string="E-Invoice Details"

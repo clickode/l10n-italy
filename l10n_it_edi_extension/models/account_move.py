@@ -123,17 +123,29 @@ class AccountMoveInherit(models.Model):
     # Computes
     # -------------------------------------------------------------------------
 
-    @api.depends("l10n_it_edi_attachment_id")
+    # Start Clickode v19 patch: l10n_it_edi_attachment_id not existing in odoo v19
+    #@api.depends("l10n_it_edi_attachment_id")
+    #def _compute_l10n_it_edi_attachment_preview_link(self):
+    #    for move in self:
+    #        if move.l10n_it_edi_attachment_id:
+    #            move.l10n_it_edi_attachment_preview_link = (
+    #                move.get_base_url()
+    #                + f"/fatturapa/preview/{move.l10n_it_edi_attachment_id.id}"
+    #            )
+    #        else:
+    #            move.l10n_it_edi_attachment_preview_link = ""
     def _compute_l10n_it_edi_attachment_preview_link(self):
         for move in self:
-            if move.l10n_it_edi_attachment_id:
-                move.l10n_it_edi_attachment_preview_link = (
-                    move.get_base_url()
-                    + f"/fatturapa/preview/{move.l10n_it_edi_attachment_id.id}"
-                )
-            else:
-                move.l10n_it_edi_attachment_preview_link = ""
-
+            # Trova l'allegato EDI italiano (compatibile v18/v19)
+            edi_domain = [
+                ('res_model', '=', 'account.move'),
+                ('res_id', '=', move.id),
+                ('name', 'ilike', 'FatturaPA')
+            ]
+            attachment = self.env['ir.attachment'].search(edi_domain, limit=1)
+            move.l10n_it_edi_attachment_preview_link = attachment.name if attachment else False
+    # end Clickode
+    
     @api.depends(
         "l10n_it_edi_amount_untaxed", "l10n_it_edi_amount_tax", "l10n_it_edi_rounding"
     )
@@ -147,18 +159,29 @@ class AccountMoveInherit(models.Model):
                 ]
             )
 
+    # Start clickode v19 patch: TODO: missing l10n_it_edi_attachment_id 
+    #@api.depends(
+    #    "move_type",
+    #    "state",
+    #    "amount_untaxed",
+    #    "amount_tax",
+    #    "amount_total",
+    #    "l10n_it_edi_attachment_id",
+    #    "l10n_it_edi_amount_untaxed",
+    #    "l10n_it_edi_amount_tax",
+    #    "l10n_it_edi_rounding",
+    #)
     @api.depends(
         "move_type",
         "state",
         "amount_untaxed",
         "amount_tax",
         "amount_total",
-        "l10n_it_edi_attachment_id",
         "l10n_it_edi_amount_untaxed",
         "l10n_it_edi_amount_tax",
         "l10n_it_edi_rounding",
     )
-    def _compute_l10n_it_edi_validation_message(self):
+    # end clickode    def _compute_l10n_it_edi_validation_message(self):
         self.l10n_it_edi_validation_message = ""
 
         invoices_to_check = self.filtered(
