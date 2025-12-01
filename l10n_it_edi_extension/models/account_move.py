@@ -181,7 +181,8 @@ class AccountMoveInherit(models.Model):
         "l10n_it_edi_amount_tax",
         "l10n_it_edi_rounding",
     )
-    # end clickode    def _compute_l10n_it_edi_validation_message(self):
+    # end clickode    
+    def _compute_l10n_it_edi_validation_message(self):
         self.l10n_it_edi_validation_message = ""
 
         invoices_to_check = self.filtered(
