@@ -9,7 +9,11 @@
         name="Add fiscalcode"
         inherit_id="portal.portal_my_details_fields"
     >
+    <!-- start clickode v19 patch
+        <xpath expr="//div[label[@for='vat']]" position="after">
+        -->
         <xpath expr="//field[@name='vat']" position="after">
+        <!-- end clickode -->
             <div
                 t-attf-class="#{error.get('l10n_it_codice_fiscale') and 'o_has_error' or ''} col-xl-6 div-fiscalcode mb-1"
             >
