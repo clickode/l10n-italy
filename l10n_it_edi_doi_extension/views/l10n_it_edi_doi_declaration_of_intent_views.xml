@@ -32,7 +32,7 @@
                     domain="[('type','=', 'out')]"
                     help="Show received declarations"
                 />
-<!-- start clickode v19 patch -- TODO: missing group
+<!-- start clickode v19 patch TODO: missing group
                 <group expand="1" string="Group By">
                     <filter
                         name="group_by_partner"
