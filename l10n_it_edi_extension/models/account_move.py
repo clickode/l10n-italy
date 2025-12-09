@@ -184,11 +184,11 @@ class AccountMoveInherit(models.Model):
     # end clickode    
     def _compute_l10n_it_edi_validation_message(self):
         self.l10n_it_edi_validation_message = ""
-
+        # start clickode v19 patch : no l10n_it_edi_attachment_id
         invoices_to_check = self.filtered(
             lambda inv: inv.is_purchase_document()
             and inv.state in ["draft", "posted"]
-            and inv.l10n_it_edi_attachment_id
+            #and inv.l10n_it_edi_attachment_id
         )
         for invoice in invoices_to_check:
             error_messages = list()
