@@ -1,0 +1,1 @@
+odoo-addon-l10n_it_account @ git+https://github.com/OCA/l10n-italy@refs/pull/5072/head#subdirectory=l10n_it_account
