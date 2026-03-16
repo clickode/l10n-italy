@@ -1,4 +1,6 @@
-from odoo import _, api, fields, models
+# Copyright 2025 Nextev Srl
+
+from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 
@@ -208,7 +210,7 @@ class PurchaseOrder(models.Model):
             )
             if declaration_tax_lines and not order.l10n_it_edi_doi_id:
                 errors.append(
-                    _(
+                    self.env._(
                         "Given the tax %s is applied, there should be a "
                         "Declaration of Intent selected.",
                         doi_tax.name,
@@ -216,7 +218,7 @@ class PurchaseOrder(models.Model):
                 )
             if any(line.taxes_id != doi_tax for line in declaration_tax_lines):
                 errors.append(
-                    _(
+                    self.env._(
                         "A line using tax %s should not contain any other taxes",
                         doi_tax.name,
                     )
@@ -251,9 +253,19 @@ class PurchaseOrder(models.Model):
                 raise ValidationError("\n".join(errors))
 
     def action_open_declaration_of_intent(self):
+        """Open declaration of intent.
+
+        Note: Purchase orders only support a single declaration,
+        but we check for consistency with the invoice multi-declaration approach.
+        """
         self.ensure_one()
+        if not self.l10n_it_edi_doi_id:
+            raise UserError(
+                self.env._("No Declaration of Intent found for %s.", self.display_name)
+            )
         return {
-            "name": _("Declaration of Intent for %s", self.display_name),
+            "name": self.env._("Declaration of Intent for %s", self.display_name),
+            "path": "declaration-intent-form",
             "type": "ir.actions.act_window",
             "view_mode": "form",
             "res_model": "l10n_it_edi_doi.declaration_of_intent",

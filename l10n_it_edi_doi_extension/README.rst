@@ -1,3 +1,7 @@
+.. image:: https://odoo-community.org/readme-banner-image
+   :target: https://odoo-community.org/get-involved?utm_source=readme
+   :alt: Odoo Community Association
+
 =====================================
 Declaration of Intent for Italy (OCA)
 =====================================
@@ -13,17 +17,17 @@ Declaration of Intent for Italy (OCA)
 .. |badge1| image:: https://img.shields.io/badge/maturity-Beta-yellow.png
     :target: https://odoo-community.org/page/development-status
     :alt: Beta
-.. |badge2| image:: https://img.shields.io/badge/licence-AGPL--3-blue.png
+.. |badge2| image:: https://img.shields.io/badge/license-AGPL--3-blue.png
     :target: http://www.gnu.org/licenses/agpl-3.0-standalone.html
     :alt: License: AGPL-3
 .. |badge3| image:: https://img.shields.io/badge/github-OCA%2Fl10n--italy-lightgray.png?logo=github
-    :target: https://github.com/OCA/l10n-italy/tree/18.0/l10n_it_edi_doi_extension
+    :target: https://github.com/OCA/l10n-italy/tree/19.0/l10n_it_edi_doi_extension
     :alt: OCA/l10n-italy
 .. |badge4| image:: https://img.shields.io/badge/weblate-Translate%20me-F47D42.png
-    :target: https://translation.odoo-community.org/projects/l10n-italy-18-0/l10n-italy-18-0-l10n_it_edi_doi_extension
+    :target: https://translation.odoo-community.org/projects/l10n-italy-19-0/l10n-italy-19-0-l10n_it_edi_doi_extension
     :alt: Translate me on Weblate
 .. |badge5| image:: https://img.shields.io/badge/runboat-Try%20me-875A7B.png
-    :target: https://runboat.odoo-community.org/builds?repo=OCA/l10n-italy&target_branch=18.0
+    :target: https://runboat.odoo-community.org/builds?repo=OCA/l10n-italy&target_branch=19.0
     :alt: Try me on Runboat
 
 |badge1| |badge2| |badge3| |badge4| |badge5|
@@ -32,13 +36,29 @@ Declaration of Intent for Italy (OCA)
 
 This module extends the functionality of l10n_it_edi_doi, enabling the
 use of the Declaration of Intent (Dichiarazione di Intento) for incoming
-vendor bills and purchase order.
+vendor bills and purchase orders.
+
+Key features:
+
+-  Support for multiple Declarations of Intent per invoice
+-  Dedicated tab in invoice form for managing DOI associations
+-  Automatic validation of DOI amounts and available thresholds
+-  Smart warnings when invoice amounts don't match DOI coverage
+-  Backward compatibility with single-declaration workflow
 
 **Italiano**
 
 Questo modulo estende la funzionalità di l10n_it_edi_doi, permettendo
 l'utilizzo della Dichiarazione di Intento per le fatture di acquisto in
 ingresso e gli ordini di acquisto.
+
+Caratteristiche principali:
+
+-  Supporto per dichiarazioni di intento multiple per fattura
+-  Tab dedicato nel form fattura per gestire le associazioni DOI
+-  Validazione automatica degli importi e soglie disponibili
+-  Avvisi intelligenti quando gli importi non corrispondono
+-  Retrocompatibilità con il flusso a dichiarazione singola
 
 **Table of contents**
 
@@ -56,8 +76,26 @@ for the Declaration of Intent for incoming vendor bills.
 In the contacts, you can create a Declaration of Intent by choosing
 between two types:
 
-- "Issued from company": for declarations issued by the company.
-- "Received from customer": for declarations received from suppliers.
+-  "Issued from company": for declarations issued by the company.
+-  "Received from customer": for declarations received from suppliers.
+
+**Multiple Declarations of Intent:**
+
+When creating or editing a vendor bill, you can now associate multiple
+Declarations of Intent:
+
+1. Go to the "Declarations of Intent" tab in the invoice form
+2. Add one or more declarations using the list
+3. For each declaration, specify the amount to be covered
+4. The module will automatically:
+
+   -  Validate that amounts don't exceed available thresholds
+   -  Show a warning if total DOI amounts don't match invoice amount
+   -  Update the invoiced amounts on each declaration
+   -  Generate protocol numbers in the XML export
+
+You can also use the traditional single-declaration field for backward
+compatibility, or mix both approaches for different invoices.
 
 **Italiano**
 
@@ -66,8 +104,29 @@ dedicata alla Dichiarazione di Intento per le fatture in ingresso. Nei
 contatti è possibile creare una Dichiarazione di Intento scegliendo tra
 due tipologie:
 
-- "Issued from company": per le dichiarazioni emesse dall'azienda.
-- "Received from customer": per le dichiarazioni ricevute dai fornitori.
+-  "Issued from company": per le dichiarazioni emesse dall'azienda.
+-  "Received from customer": per le dichiarazioni ricevute dai
+   fornitori.
+
+**Dichiarazioni di Intento Multiple:**
+
+Durante la creazione o modifica di una fattura fornitore, è ora
+possibile associare più Dichiarazioni di Intento:
+
+1. Accedi al tab "Dichiarazioni di Intento" nel form della fattura
+2. Aggiungi una o più dichiarazioni usando la lista
+3. Per ogni dichiarazione, specifica l'importo da coprire
+4. Il modulo automaticamente:
+
+   -  Valida che gli importi non superino le soglie disponibili
+   -  Mostra un avviso se il totale DOI non corrisponde all'importo
+      fattura
+   -  Aggiorna gli importi fatturati su ogni dichiarazione
+   -  Genera i numeri di protocollo nell'esportazione XML
+
+È possibile continuare ad usare il campo tradizionale a dichiarazione
+singola per retrocompatibilità, o combinare entrambi gli approcci per
+fatture diverse.
 
 Bug Tracker
 ===========
@@ -75,7 +134,7 @@ Bug Tracker
 Bugs are tracked on `GitHub Issues <https://github.com/OCA/l10n-italy/issues>`_.
 In case of trouble, please check there if your issue has already been reported.
 If you spotted it first, help us to smash it by providing a detailed and welcomed
-`feedback <https://github.com/OCA/l10n-italy/issues/new?body=module:%20l10n_it_edi_doi_extension%0Aversion:%2018.0%0A%0A**Steps%20to%20reproduce**%0A-%20...%0A%0A**Current%20behavior**%0A%0A**Expected%20behavior**>`_.
+`feedback <https://github.com/OCA/l10n-italy/issues/new?body=module:%20l10n_it_edi_doi_extension%0Aversion:%2019.0%0A%0A**Steps%20to%20reproduce**%0A-%20...%0A%0A**Current%20behavior**%0A%0A**Expected%20behavior**>`_.
 
 Do not contact contributors directly about support or help with technical issues.
 
@@ -90,7 +149,10 @@ Authors
 Contributors
 ------------
 
-- Nextev S.r.l<odoo@nextev.it>
+-  Nextev Srl<odoo@nextev.it>
+-  `Stesi Consulting <https://www.stesi.consulting>`__:
+
+   -  Michele Di Croce <dicroce.m@stesi.consulting>
 
 Maintainers
 -----------
@@ -105,6 +167,6 @@ OCA, or the Odoo Community Association, is a nonprofit organization whose
 mission is to support the collaborative development of Odoo features and
 promote its widespread use.
 
-This module is part of the `OCA/l10n-italy <https://github.com/OCA/l10n-italy/tree/18.0/l10n_it_edi_doi_extension>`_ project on GitHub.
+This module is part of the `OCA/l10n-italy <https://github.com/OCA/l10n-italy/tree/19.0/l10n_it_edi_doi_extension>`_ project on GitHub.
 
 You are welcome to contribute. To learn how please visit https://odoo-community.org/page/Contribute.
