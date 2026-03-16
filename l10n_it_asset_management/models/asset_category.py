@@ -55,7 +55,9 @@ class AssetCategory(models.Model):
     comment = fields.Text()
 
     company_id = fields.Many2one(
-        "res.company", default=get_default_company_id, string="Company"
+        "res.company",
+        default=lambda self: self.get_default_company_id(),
+        string="Company",
     )
 
     depreciation_account_id = fields.Many2one(
@@ -102,7 +104,7 @@ class AssetCategory(models.Model):
     type_ids = fields.One2many(
         "asset.category.depreciation.type",
         "category_id",
-        default=get_default_type_ids,
+        default=lambda self: self.get_default_type_ids(),
         string="Depreciation Types",
     )
 
@@ -126,8 +128,7 @@ class AssetCategory(models.Model):
         if self.env["asset.asset"].sudo().search([("category_id", "in", self.ids)]):
             raise UserError(
                 self.env._(
-                    "Cannot delete categories while they're still linked"
-                    " to an asset."
+                    "Cannot delete categories while they're still linked to an asset."
                 )
             )
 
