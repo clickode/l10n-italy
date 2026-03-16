@@ -17,5 +17,4 @@
         "security/ir.model.access.csv",
     ],
     "installable": True,
-    "post_init_hook": "_l10n_it_edi_related_document_post_init_hook",
 }
