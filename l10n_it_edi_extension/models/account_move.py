@@ -4,6 +4,7 @@
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError
+from odoo.fields import Domain
 from odoo.tools import float_compare, html2plaintext
 
 from odoo.addons.base.models.ir_qweb_fields import Markup
@@ -23,6 +24,11 @@ class AccountMoveInherit(models.Model):
     l10n_it_edi_attachment_preview_link = fields.Char(
         string="Preview link",
         compute="_compute_l10n_it_edi_attachment_preview_link",
+    )
+    l10n_it_edi_ext_attachment_in_id = fields.Many2one(
+        comodel_name="ir.attachment",
+        string="Imported Electronic Bill",
+        readonly=True,
     )
     l10n_it_edi_line_ids = fields.One2many(
         "l10n_it_edi.line",
@@ -123,29 +129,16 @@ class AccountMoveInherit(models.Model):
     # Computes
     # -------------------------------------------------------------------------
 
-    # Start Clickode v19 patch: l10n_it_edi_attachment_id not existing in odoo v19
-    #@api.depends("l10n_it_edi_attachment_id")
-    #def _compute_l10n_it_edi_attachment_preview_link(self):
-    #    for move in self:
-    #        if move.l10n_it_edi_attachment_id:
-    #            move.l10n_it_edi_attachment_preview_link = (
-    #                move.get_base_url()
-    #                + f"/fatturapa/preview/{move.l10n_it_edi_attachment_id.id}"
-    #            )
-    #        else:
-    #            move.l10n_it_edi_attachment_preview_link = ""
+    @api.depends("l10n_it_edi_attachment_file")
     def _compute_l10n_it_edi_attachment_preview_link(self):
         for move in self:
-            # Trova l'allegato EDI italiano (compatibile v18/v19)
-            edi_domain = [
-                ('res_model', '=', 'account.move'),
-                ('res_id', '=', move.id),
-                ('name', 'ilike', 'FatturaPA')
-            ]
-            attachment = self.env['ir.attachment'].search(edi_domain, limit=1)
-            move.l10n_it_edi_attachment_preview_link = attachment.name if attachment else False
-    # end Clickode
-    
+            if move.l10n_it_edi_attachment_file:
+                move.l10n_it_edi_attachment_preview_link = (
+                    move.get_base_url() + f"/fatturapa/preview/{move.id}"
+                )
+            else:
+                move.l10n_it_edi_attachment_preview_link = ""
+
     @api.depends(
         "l10n_it_edi_amount_untaxed", "l10n_it_edi_amount_tax", "l10n_it_edi_rounding"
     )
@@ -159,36 +152,32 @@ class AccountMoveInherit(models.Model):
                 ]
             )
 
-    # Start clickode v19 patch: TODO: missing l10n_it_edi_attachment_id 
-    #@api.depends(
-    #    "move_type",
-    #    "state",
-    #    "amount_untaxed",
-    #    "amount_tax",
-    #    "amount_total",
-    #    "l10n_it_edi_attachment_id",
-    #    "l10n_it_edi_amount_untaxed",
-    #    "l10n_it_edi_amount_tax",
-    #    "l10n_it_edi_rounding",
-    #)
+    def _l10n_it_edi_is_to_validate(self):
+        self.ensure_one()
+        return (
+            self.is_purchase_document()
+            or self.env.context.get("l10n_it_validate_all_invoices")
+            and self.is_sale_document()
+        )
+
     @api.depends(
         "move_type",
         "state",
         "amount_untaxed",
         "amount_tax",
         "amount_total",
+        "l10n_it_edi_attachment_file",
         "l10n_it_edi_amount_untaxed",
         "l10n_it_edi_amount_tax",
         "l10n_it_edi_rounding",
     )
-    # end clickode    
     def _compute_l10n_it_edi_validation_message(self):
         self.l10n_it_edi_validation_message = ""
-        # start clickode v19 patch : no l10n_it_edi_attachment_id
+
         invoices_to_check = self.filtered(
-            lambda inv: inv.is_purchase_document()
+            lambda inv: inv._l10n_it_edi_is_to_validate()
             and inv.state in ["draft", "posted"]
-            #and inv.l10n_it_edi_attachment_id
+            and inv.l10n_it_edi_attachment_file
         )
         for invoice in invoices_to_check:
             error_messages = list()
@@ -215,10 +204,24 @@ class AccountMoveInherit(models.Model):
 
         return {
             "type": "ir.actions.act_url",
-            "name": "Show preview",
+            "name": self.env._("Show preview"),
             "url": self.l10n_it_edi_attachment_preview_link,
             "target": "new",
         }
+
+    def _get_invoice_legal_documents(self, filetype, allow_fallback=False):
+        self.ensure_one()
+
+        if filetype == "fatturapa":
+            if fatturapa_attachment := self.l10n_it_edi_ext_attachment_in_id:
+                return {
+                    "filename": fatturapa_attachment.name,
+                    "filetype": "xml",
+                    "content": fatturapa_attachment.raw,
+                }
+        return super()._get_invoice_legal_documents(
+            filetype, allow_fallback=allow_fallback
+        )
 
     # -------------------------------------------------------------------------
     # Helpers
@@ -384,7 +387,6 @@ class AccountMoveInherit(models.Model):
             for element_summary in elements_summary:
                 self.l10n_it_edi_amount_tax += get_float(element_summary, ".//Imposta")
 
-        extra_info["l10n_it_edi_ext_body_tree"] = body_tree
         return extra_info, message_to_log
 
     def _l10n_it_edi_update_partner(self, xml_tree, role, partner):
@@ -393,8 +395,46 @@ class AccountMoveInherit(models.Model):
         partner.update(vals)
         return partner
 
+    def _l10n_it_edi_search_tax_for_import(
+        self, company, percentage, extra_domain=None, l10n_it_exempt_reason=None
+    ):
+        # Check if a tax of the default product fits what is requested
+        partner_default_product = self.partner_id.l10n_it_edi_ext_default_product_id
+        if default_product_taxes := partner_default_product.supplier_taxes_id:
+            product_extra_domain = Domain.AND(
+                [
+                    extra_domain,
+                    [
+                        ("id", "in", default_product_taxes.ids),
+                    ],
+                ]
+            )
+            tax = super()._l10n_it_edi_search_tax_for_import(
+                company,
+                percentage,
+                product_extra_domain,
+                l10n_it_exempt_reason=l10n_it_exempt_reason,
+            )
+            if not tax:
+                tax = super()._l10n_it_edi_search_tax_for_import(
+                    company,
+                    percentage,
+                    extra_domain,
+                    l10n_it_exempt_reason=l10n_it_exempt_reason,
+                )
+        else:
+            tax = super()._l10n_it_edi_search_tax_for_import(
+                company,
+                percentage,
+                extra_domain,
+                l10n_it_exempt_reason=l10n_it_exempt_reason,
+            )
+        return tax
+
     def _l10n_it_edi_ext_import_summary_line(self, element, extra_info=None):
         messages_to_log = []
+        if extra_info is None:
+            extra_info = {}
         company = self.company_id
         percentage = get_float(element, ".//AliquotaIVA")
         extra_domain = extra_info.get(
@@ -408,17 +448,21 @@ class AccountMoveInherit(models.Model):
             l10n_it_exempt_reason=l10n_it_exempt_reason,
         )
         if tax:
-            self.invoice_line_ids += self.env["account.move.line"].create(
-                {
-                    "move_id": self.id,
-                    "name": self.env._(
-                        "Summary for tax amount %(percentage)s",
-                        percentage=percentage,
-                    ),
-                    "price_unit": get_float(element, ".//ImponibileImporto"),
-                    "tax_ids": tax.ids,
-                }
-            )
+            line_values = {
+                "move_id": self.id,
+                "name": self.env._(
+                    "Summary for tax amount %(percentage)s",
+                    percentage=percentage,
+                ),
+                "price_unit": get_float(element, ".//ImponibileImporto"),
+                "tax_ids": tax.ids,
+            }
+            if (
+                partner_default_product
+                := self.partner_id.l10n_it_edi_ext_default_product_id
+            ):
+                line_values["product_id"] = partner_default_product.id
+            self.env["account.move.line"].create(line_values)
         else:
             messages_to_log.append(
                 Markup("<br/>").join(
@@ -440,12 +484,12 @@ class AccountMoveInherit(models.Model):
             extra_info = dict()
         messages_to_log = []
         company = move_line.company_id
+        partner = move_line.partner_id
         import_detail_level = (
-            move_line.partner_id.l10n_it_edi_import_detail_level
+            partner.l10n_it_edi_import_detail_level
             or company.l10n_it_edi_import_detail_level
         )
         if import_detail_level == "min":
-            move_line.unlink()
             line_description = " ".join(get_text(element, ".//Descrizione").split())
             messages_to_log.append(
                 Markup("<br/>").join(
@@ -460,17 +504,22 @@ class AccountMoveInherit(models.Model):
                     )
                 )
             )
-        elif (
-            body_tree := extra_info.get("l10n_it_edi_ext_body_tree")
-        ) is not None and import_detail_level == "tax":
-            move_line.unlink()
-            tax_level_imported = extra_info.get("l10n_it_edi_ext_tax_level_imported")
-            if not tax_level_imported:
-                for summary_line in body_tree.xpath(".//DatiBeniServizi/DatiRiepilogo"):
-                    messages_to_log += self._l10n_it_edi_ext_import_summary_line(
-                        summary_line, extra_info=extra_info
+        elif import_detail_level == "tax":
+            # Lines will be replaced with summary lines in _l10n_it_edi_import_invoice
+            line_description = " ".join(get_text(element, ".//Descrizione").split())
+            messages_to_log.append(
+                Markup("<br/>").join(
+                    (
+                        self.env._(
+                            "Line with description %(line_description)s "
+                            "has been replaced by summary line "
+                            "because import detail level is tax.",
+                            line_description=line_description,
+                        ),
+                        self._compose_info_message(element, "."),
                     )
-                extra_info["l10n_it_edi_ext_tax_level_imported"] = True
+                )
+            )
         elif import_detail_level == "max":
             # Admin. ref.
             if admin_ref := get_text(element, ".//RiferimentoAmministrazione"):
@@ -542,6 +591,23 @@ class AccountMoveInherit(models.Model):
             messages_to_log += super()._l10n_it_edi_import_line(
                 element, move_line, extra_info=extra_info
             )
+            if not move_line.product_id and (
+                partner_default_product := partner.l10n_it_edi_ext_default_product_id
+            ):
+                # If no product is found use the default one set on the partner,
+                # without recomputing what was assigned
+                with self.env.protecting(
+                    [
+                        move_line._fields[field_name]
+                        for field_name in [
+                            "price_unit",
+                            "tax_ids",
+                        ]
+                    ],
+                    move_line,
+                ):
+                    move_line.product_id = partner_default_product
+
         else:
             raise UserError(
                 self.env._(
@@ -760,6 +826,34 @@ class AccountMoveInherit(models.Model):
     def _l10n_it_edi_import_invoice(self, invoice, data, is_new):
         invoice = super()._l10n_it_edi_import_invoice(invoice, data, is_new)
 
+        if invoice:
+            import_detail_level = (
+                invoice.partner_id.l10n_it_edi_import_detail_level
+                or invoice.company_id.l10n_it_edi_import_detail_level
+            )
+            if import_detail_level == "min":
+                # Delete all lines - Odoo creates them in the import loop
+                # but we don't want any for minimum detail level
+                invoice.invoice_line_ids.unlink()
+            elif import_detail_level == "tax":
+                # Delete all lines created by Odoo and create summary lines instead
+                invoice.invoice_line_ids.unlink()
+                body_tree = data.get("xml_tree")
+                if body_tree is not None:
+                    for summary_line in body_tree.xpath(
+                        ".//DatiBeniServizi/DatiRiepilogo"
+                    ):
+                        messages = invoice._l10n_it_edi_ext_import_summary_line(
+                            summary_line,
+                            extra_info={
+                                "type_tax_use_domain": [
+                                    ("type_tax_use", "=", "purchase")
+                                ]
+                            },
+                        )
+                        for message in messages:
+                            invoice.sudo().message_post(body=message)
+
         body_tree = data["xml_tree"]
         is_incoming = self.is_purchase_document(include_receipts=True)
         partner_role = "seller" if is_incoming else "buyer"
@@ -786,5 +880,8 @@ class AccountMoveInherit(models.Model):
             "tax_representative",
         ):
             invoice.l10n_it_edi_tax_representative_id = tax_representative
+
+        if invoice and (attachment := data["attachment"]):
+            invoice.l10n_it_edi_ext_attachment_in_id = attachment.id
 
         return invoice
