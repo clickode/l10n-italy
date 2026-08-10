@@ -59,34 +59,47 @@ class EInvoiceImportFileWizard(models.TransientModel):
                             }
                         )
 
-                        if not attachment._is_l10n_it_edi_import_file():
+                        # start clickode v19 patch: API di import EDI spostata
+                        # da `ir.attachment` a `account.document.import.mixin`.
+                        move_model = self.env["account.move"].with_company(company)
+                        file_data = move_model._to_files_data(attachment)[0]
+                        if (
+                            not move_model._is_l10n_it_edi_import_file(file_data)
+                            or file_data["xml_tree"] is None
+                        ):
                             _logger.info(f"Skipping {filename}, not an XML/P7M file")
                             attachment.unlink()
                             continue
 
-                        for file_data in attachment._decode_edi_l10n_it_edi(
-                            filename, content
-                        ):
-                            move = (
-                                self.env["account.move"]
-                                .with_company(company)
-                                .create({})
-                            )
-                            attachment.write(
+                        # `_unwrap_attachment` crea un ir.attachment per ogni
+                        # FatturaElettronicaBody oltre il primo.
+                        files_data = [
+                            file_data,
+                            *move_model._unwrap_attachment(file_data),
+                        ]
+                        for move_file_data in files_data:
+                            move = move_model.create({})
+                            move_file_data["attachment"].write(
                                 {
                                     "res_model": "account.move",
                                     "res_id": move.id,
                                     "res_field": "l10n_it_edi_attachment_file",
                                 }
                             )
+                            # come il percorso SdI nativo
+                            # (l10n_it_edi._l10n_it_edi_process_downloads_attachments)
+                            move.l10n_it_edi_attachment_name = move_file_data["name"]
 
                             move.with_context(
                                 account_predictive_bills_disable_prediction=True,
                                 no_new_invoice=True,
-                            ).message_post(attachment_ids=attachment.ids)
+                            ).message_post(
+                                attachment_ids=move_file_data["attachment"].ids
+                            )
 
-                            move._l10n_it_edi_import_invoice(move, file_data, True)
+                            move._l10n_it_edi_import_invoice(move, move_file_data, True)
                             moves |= move
+                        # end clickode v19 patch
 
         return {
             "view_type": "form",

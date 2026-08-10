@@ -32,13 +32,21 @@ class TestFatturaPAXMLValidation(Common):
                 }
             )
 
-            if not attachment._is_l10n_it_edi_import_file():
+            # start clickode v19 patch: API di import EDI spostata
+            # da `ir.attachment` a `account.document.import.mixin`.
+            move_model = self.env["account.move"].with_company(self.company)
+            file_data = move_model._to_files_data(attachment)[0]
+            if (
+                not move_model._is_l10n_it_edi_import_file(file_data)
+                or file_data["xml_tree"] is None
+            ):
                 attachment.unlink()
                 return False
 
-            for file_data in attachment._decode_edi_l10n_it_edi(filename, content):
-                move = self.env["account.move"].with_company(self.company).create({})
-                attachment.write(
+            files_data = [file_data, *move_model._unwrap_attachment(file_data)]
+            for move_file_data in files_data:
+                move = move_model.create({})
+                move_file_data["attachment"].write(
                     {
                         "res_model": "account.move",
                         "res_id": move.id,
@@ -46,14 +54,19 @@ class TestFatturaPAXMLValidation(Common):
                     }
                 )
 
-                move._l10n_it_edi_import_invoice(move, file_data, True)
+                move.l10n_it_edi_attachment_name = move_file_data["name"]
+                # decodifica gia' completa qui: e' lo stesso decoder che
+                # `_extend_with_attachments` selezionerebbe per 'l10n_it.fatturapa'
+                # (v. l10n_it_edi.AccountMove._get_edi_decoder), quindi le chiamate
+                # a `_extend_with_attachments` nei test sono state rimosse.
+                move._l10n_it_edi_import_invoice(move, move_file_data, True)
                 moves |= move
+            # end clickode v19 patch
 
         return moves
 
     def test_02_xml_import(self):
         move = self._edi_import_invoice("IT02780790107_11005.xml")
-        move._extend_with_attachments(move.l10n_it_edi_attachment_id, new=True)
         self.assertEqual(move.ref, "124")
         self.assertEqual(move.partner_id.name, "Societa' Alpha SRL")
         self.assertEqual(move.invoice_line_ids[0].tax_ids[0].name, "22% G")
@@ -72,7 +85,6 @@ class TestFatturaPAXMLValidation(Common):
 
     def test_03_xml_import(self):
         move = self._edi_import_invoice("IT05979361218_003.xml")
-        move._extend_with_attachments(move.l10n_it_edi_attachment_id, new=True)
         self.assertEqual(move.ref, "FT/2015/0008")
         self.assertEqual(move.l10n_it_edi_sender, "TZ")
         self.assertEqual(
@@ -91,7 +103,6 @@ class TestFatturaPAXMLValidation(Common):
 
     def test_04_xml_import(self):
         move = self._edi_import_invoice("IT02780790107_11004.xml")
-        move._extend_with_attachments(move.l10n_it_edi_attachment_id, new=True)
         self.assertEqual(move.ref, "123")
         self.assertEqual(len(move.invoice_line_ids[0].tax_ids), 1)
         self.assertEqual(move.invoice_line_ids[0].tax_ids[0].name, "22% G")
@@ -183,7 +194,7 @@ class TestFatturaPAXMLValidation(Common):
         }
 
         for out_move in out_moves:
-            attachment = out_move.l10n_it_edi_attachment_id
+            attachment = out_move._l10n_it_edi_get_attachment()
             expected_invoices_values = check_invoices_values.get(attachment.name)
             if expected_invoices_values is not None:
                 for move, expected_values in zip(

@@ -24,36 +24,24 @@
             >
                 <field name="l10n_it_edi_admin_ref" optional="hide" />
             </xpath>
-            <!-- start clickode v19 patch   TODO: mssing electronic invoice preview
+            <!-- start clickode v19 patch: in Odoo 19 non esiste piu' il campo
+                 `l10n_it_edi_attachment_id`; la page nativa mostra gia'
+                 `l10n_it_edi_attachment_file`, qui si aggiunge solo il pulsante. -->
             <xpath
-                expr="//page[@name='electronic_invoicing']//field[@name='l10n_it_edi_attachment_id']"
-                position="attributes"
-            >
-                <attribute name="invisible">1</attribute>
-            </xpath>
-            <xpath
-                expr="//page[@name='electronic_invoicing']//field[@name='l10n_it_edi_attachment_id']"
+                expr="//page[@name='electronic_invoicing']//field[@name='l10n_it_edi_attachment_name']"
                 position="after"
             >
-                <label
-                    for="l10n_it_edi_attachment_id"
-                    class="oe_inline"
-                    invisible="not l10n_it_edi_attachment_id"
+                <field name="l10n_it_edi_attachment_preview_link" invisible="1" />
+                <button
+                    name="action_l10n_it_edi_attachment_preview"
+                    type="object"
+                    string="Preview FPA"
+                    icon="fa-file-pdf-o"
+                    groups="account.group_account_invoice"
+                    invisible="not l10n_it_edi_attachment_preview_link"
                 />
-                <div class="o_row" invisible="not l10n_it_edi_attachment_id">
-                    <field
-                        name="l10n_it_edi_attachment_id"
-                        groups="account.group_account_invoice"
-                        readonly="1"
-                    />
-                    <button
-                        name="action_l10n_it_edi_attachment_preview"
-                        type="object"
-                        string="Preview FPA"
-                    />
-                </div>
             </xpath>
-            -->
+            <!-- end clickode v19 patch -->
             <xpath expr="//page[@name='electronic_invoicing']" position="after">
                 <page
                     string="E-Invoice Details"

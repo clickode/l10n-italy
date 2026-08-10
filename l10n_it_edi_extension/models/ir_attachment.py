@@ -18,10 +18,20 @@ class IrAttachmentInherit(models.Model):
         return "FoglioStileAssoSoftware.xsl"
 
     def get_xml_string(self):
-        if not self._is_l10n_it_edi_import_file():
+        # start clickode v19 patch: in Odoo 19 la decodifica EDI e' passata da
+        # `ir.attachment` al mixin `account.document.import.mixin` su `account.move`.
+        # `_to_files_data` popola `xml_tree` tramite `_get_xml_tree`, che `l10n_it_edi`
+        # estende per gestire parser `recover=True` e firma CAdES dei file `.p7m`.
+        self.ensure_one()
+        move_model = self.env["account.move"]
+        file_data = move_model._to_files_data(self)[0]
+        if (
+            not move_model._is_l10n_it_edi_import_file(file_data)
+            or file_data["xml_tree"] is None
+        ):
             raise UserError(self.env._("Invalid xml %s.") % self.name)
-        xml_string = self._decode_edi_l10n_it_edi(self.name, self.raw)[0]["content"]
-        return xml_string
+        return etree.tostring(file_data["xml_tree"])
+        # end clickode v19 patch
 
     def get_fattura_elettronica_preview(self):
         xsl_path = tools.misc.file_path(

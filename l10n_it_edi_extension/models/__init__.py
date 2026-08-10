@@ -12,4 +12,5 @@ from . import l10n_it_edi_line
 from . import account_move_line
 from . import account_move
 from . import ir_attachment
-from . import account_journal
+# clickode v19 patch: `account_journal` rimosso, lo split delle FatturaPA
+# multi-body e' nativo in Odoo 19 (l10n_it_edi.AccountMove._unwrap_attachment).

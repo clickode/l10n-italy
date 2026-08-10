@@ -123,29 +123,21 @@ class AccountMoveInherit(models.Model):
     # Computes
     # -------------------------------------------------------------------------
 
-    # Start Clickode v19 patch: l10n_it_edi_attachment_id not existing in odoo v19
-    #@api.depends("l10n_it_edi_attachment_id")
-    #def _compute_l10n_it_edi_attachment_preview_link(self):
-    #    for move in self:
-    #        if move.l10n_it_edi_attachment_id:
-    #            move.l10n_it_edi_attachment_preview_link = (
-    #                move.get_base_url()
-    #                + f"/fatturapa/preview/{move.l10n_it_edi_attachment_id.id}"
-    #            )
-    #        else:
-    #            move.l10n_it_edi_attachment_preview_link = ""
+    # start clickode v19 patch: `l10n_it_edi_attachment_id` non esiste in Odoo 19,
+    # sostituito da `l10n_it_edi_attachment_file` (Binary attachment=True).
+    # L'ir.attachment si recupera con `_l10n_it_edi_get_attachment()`.
+    @api.depends("attachment_ids", "l10n_it_edi_attachment_name")
     def _compute_l10n_it_edi_attachment_preview_link(self):
         for move in self:
-            # Trova l'allegato EDI italiano (compatibile v18/v19)
-            edi_domain = [
-                ('res_model', '=', 'account.move'),
-                ('res_id', '=', move.id),
-                ('name', 'ilike', 'FatturaPA')
-            ]
-            attachment = self.env['ir.attachment'].search(edi_domain, limit=1)
-            move.l10n_it_edi_attachment_preview_link = attachment.name if attachment else False
-    # end Clickode
-    
+            attachment = move._l10n_it_edi_get_attachment()
+            move.l10n_it_edi_attachment_preview_link = (
+                move.get_base_url() + f"/fatturapa/preview/{attachment.id}"
+                if attachment
+                else False
+            )
+
+    # end clickode v19 patch
+
     @api.depends(
         "l10n_it_edi_amount_untaxed", "l10n_it_edi_amount_tax", "l10n_it_edi_rounding"
     )
@@ -159,36 +151,28 @@ class AccountMoveInherit(models.Model):
                 ]
             )
 
-    # Start clickode v19 patch: TODO: missing l10n_it_edi_attachment_id 
-    #@api.depends(
-    #    "move_type",
-    #    "state",
-    #    "amount_untaxed",
-    #    "amount_tax",
-    #    "amount_total",
-    #    "l10n_it_edi_attachment_id",
-    #    "l10n_it_edi_amount_untaxed",
-    #    "l10n_it_edi_amount_tax",
-    #    "l10n_it_edi_rounding",
-    #)
+    # start clickode v19 patch: `l10n_it_edi_attachment_id` sostituito
+    # da `l10n_it_edi_attachment_name` / `_l10n_it_edi_get_attachment()`.
     @api.depends(
         "move_type",
         "state",
         "amount_untaxed",
         "amount_tax",
         "amount_total",
+        "attachment_ids",
+        "l10n_it_edi_attachment_name",
         "l10n_it_edi_amount_untaxed",
         "l10n_it_edi_amount_tax",
         "l10n_it_edi_rounding",
     )
-    # end clickode    
+    # end clickode v19 patch
     def _compute_l10n_it_edi_validation_message(self):
         self.l10n_it_edi_validation_message = ""
-        # start clickode v19 patch : no l10n_it_edi_attachment_id
         invoices_to_check = self.filtered(
             lambda inv: inv.is_purchase_document()
             and inv.state in ["draft", "posted"]
-            #and inv.l10n_it_edi_attachment_id
+            # clickode v19 patch: era `and inv.l10n_it_edi_attachment_id`
+            and inv._l10n_it_edi_get_attachment()
         )
         for invoice in invoices_to_check:
             error_messages = list()
@@ -223,6 +207,49 @@ class AccountMoveInherit(models.Model):
     # -------------------------------------------------------------------------
     # Helpers
     # -------------------------------------------------------------------------
+
+    # start clickode v19 patch: rimpiazza `l10n_it_edi_attachment_id` (rimosso in v19)
+    def _l10n_it_edi_get_attachment(self):
+        """Ritorna l'``ir.attachment`` FatturaPA della fattura, o un recordset vuoto.
+
+        Due strategie, perche' i percorsi di import si comportano diversamente:
+
+        - SdI e wizard di import ZIP collegano l'allegato con
+          ``res_field='l10n_it_edi_attachment_file'``; va nominato nel dominio,
+          altrimenti ``ir.attachment._search`` lo filtra via d'ufficio;
+        - l'upload manuale dal giornale scrive solo ``res_model``/``res_id``,
+          quindi l'allegato si riconosce dal contenuto.
+        """
+        self.ensure_one()
+        attachment_model = self.env["ir.attachment"]
+        attachment = attachment_model.search(
+            [
+                ("res_model", "=", "account.move"),
+                ("res_id", "=", self.id),
+                ("res_field", "=", "l10n_it_edi_attachment_file"),
+            ],
+            limit=1,
+        )
+        if attachment:
+            return attachment
+
+        for candidate in self.attachment_ids:
+            # controllo a buon mercato su nome/mimetype prima di leggere e
+            # parsare il contenuto: `_to_files_data` costruisce l'albero XML.
+            mimetype = candidate.mimetype or ""
+            probe = {
+                "name": candidate.name or "",
+                "mimetype": mimetype,
+                # `raw` serve solo al ramo 'text/plain' del controllo
+                "raw": candidate.raw if "text/plain" in mimetype else None,
+            }
+            if not self._is_l10n_it_edi_import_file(probe):
+                continue
+            if self._to_files_data(candidate)[0]["xml_tree"] is not None:
+                return candidate
+        return attachment_model
+
+    # end clickode v19 patch
 
     def _l10n_it_edi_add_base_lines_xml_values(
         self, base_lines_aggregated_values, is_downpayment
