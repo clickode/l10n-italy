@@ -23,3 +23,16 @@ class Common(TestItEdi):
                 "invoice_edi_format": "it_edi_xml",
             }
         )
+
+        cls.foreign_shipping_partner_a = cls.env["res.partner"].create(
+            {
+                "name": "John Doe Shipping",
+                "country_id": cls.env.ref("base.us").id,
+                "state_id": cls.env.ref("base.state_us_5").id,
+                "street": "1 Infinite Loop",
+                "zip": "95014",
+                "city": "Cupertino",
+                "company_id": False,
+                "invoice_edi_format": "it_edi_xml",
+            }
+        )
