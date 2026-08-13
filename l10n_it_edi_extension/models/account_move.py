@@ -288,15 +288,6 @@ class AccountMoveInherit(models.Model):
 
         res["causale"] = causale_list
 
-        # Addresses added by this module (IndirizzoResa, StabileOrganizzazione)
-        # must be normalized like the core does for Sede: foreign countries are
-        # not mapped by the Tax Agency, so CAP is fixed at '00000' and Provincia
-        # is omitted.
-        res["shipping_info"] = self.partner_shipping_id._l10n_it_edi_get_values()
-        edi_company = self.company_id._l10n_it_get_edi_company()
-        stable_organization = edi_company.l10n_edi_it_stable_organization
-        res["stable_organization_info"] = stable_organization._l10n_it_edi_get_values()
-
         return res
 
     def _l10n_it_edi_get_extra_info(
